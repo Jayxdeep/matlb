@@ -1,38 +1,29 @@
+clc; clear; close all;
 img = imread('peppers.png');
-bw = bwareaopen(imcomplement(imbinarize(rgb2gray(img))),100);
- 
-l = bwlabel(bw);
-s = regionprops(l,'Area','Perimeter','BoundingBox','Eccentricity');
- 
-n = numel(s); 
-f = zeros(n,3);
- 
-for k = 1:n
-    f(k,1) = (s(k).Perimeter^2)/(4*pi*s(k).Area);      
-    f(k,2) = s(k).Eccentricity;                        
-    f(k,3) = s(k).BoundingBox(3)/s(k).BoundingBox(4);  
-end
-%% Automatic Class Labels = 1,2,3,4,...n
-labels = 1:n;     
-pred = zeros(1,n);
- 
+bw  = bwareaopen(imcomplement(imbinarize(rgb2gray(img))),100);
+L = bwlabel(bw);
+S = regionprops(L,'Area','Perimeter','BoundingBox','Eccentricity');
+n = numel(S);
+
+% Feature matrix: [Compactness, Eccentricity, Aspect Ratio]
+F = zeros(n,3);
 for i = 1:n
-    d = bsxfun(@minus, f, f(i,:));     
-    dist = sqrt(sum(d.^2, 2));         
-    [~,idx] = min(dist);
-    pred(i) = labels(idx);
+    F(i,:) = [ ...
+        (S(i).Perimeter^2)/(4*pi*S(i).Area), ...
+        S(i).Eccentricity, ...
+        S(i).BoundingBox(3)/S(i).BoundingBox(4) ];
 end
- 
-fprintf('Accuracy: %.2f%%\n', sum(pred==labels)/n*100);
- 
-disp(table(f(:,1),f(:,2),f(:,3),pred','VariableNames', ...
-    {'Compact','Ecc','AR','PredictedClass'}));
- 
-imshow(img); hold on;
-for k = 1:n
-    rectangle('Position',s(k).BoundingBox,'EdgeColor','g','LineWidth',2);
-    text(s(k).BoundingBox(1),s(k).BoundingBox(2)-10, ...
-        sprintf('Class %d',pred(k)), ...
-        'Color','r','FontSize',12,'FontWeight','bold');
+labels = (1:n)'; pred = labels;
+for i = 1:n
+    [~,pred(i)] = min(vecnorm(F - F(i,:),2,2));
 end
-hold off;
+fprintf('Accuracy: %.2f%%\n', mean(pred==labels)*100)
+disp(table(F(:,1),F(:,2),F(:,3),pred, ...
+    'VariableNames',{'Compact','Ecc','AR','Class'}))
+imshow(img); hold on
+for i = 1:n
+    rectangle('Position',S(i).BoundingBox,'EdgeColor','g','LineWidth',2)
+    text(S(i).BoundingBox(1),S(i).BoundingBox(2)-10, ...
+        ['Class ',num2str(pred(i))],'Color','r','FontSize',12)
+end
+hold off
